@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
+import dynamic from "next/dynamic";
 import { Badge, Card, Input, Select, Spinner } from "@kaistrum/stratum-ui";
 import { Center } from "@/components/ui/Center";
 import { Group } from "@/components/ui/Stack";
@@ -9,6 +10,8 @@ import { IconSearch } from "@tabler/icons-react";
 import Header from "@/components/Header";
 import type { DamageLevel, DisasterType, InfrastructureType, PointFeature, TaskStatus } from "@/types";
 import { DAMAGE_COLORS, DISASTER_COLORS } from "@/types";
+
+const IncidentDrawer = dynamic(() => import("@/components/IncidentDrawer"), { ssr: false });
 
 interface AuthUser {
 	id: string;
@@ -118,6 +121,7 @@ export default function IncidentsPage() {
 	const [casualties, setCasualties] = useState<CasualtyFilter | null>(null);
 	const [disasterType, setDisasterType] = useState<DisasterType | null>(null);
 	const [status, setStatus] = useState<TaskStatus | null>(null);
+	const [selectedIncident, setSelectedIncident] = useState<PointFeature | null>(null);
 
 	useEffect(() => {
 		const raw = localStorage.getItem("auth_user");
@@ -300,7 +304,11 @@ export default function IncidentsPage() {
 										const props = point.properties;
 										const statusStyle = STATUS_STYLES[props.task_status];
 										return (
-											<Table.Tr key={props.point_id}>
+											<Table.Tr
+												key={props.point_id}
+												onClick={() => setSelectedIncident(point)}
+												style={{ cursor: "pointer" }}
+											>
 												<Table.Td className="tnum" style={{ fontWeight: 600 }}>{props.point_id.replace("P-", "INC-")}</Table.Td>
 												<Table.Td style={{ minWidth: 220 }}>{props.infrastructure_name}</Table.Td>
 												<Table.Td>
@@ -348,6 +356,10 @@ export default function IncidentsPage() {
 					</Group>
 				</div>
 			</main>
+
+			{selectedIncident && (
+				<IncidentDrawer point={selectedIncident} onClose={() => setSelectedIncident(null)} />
+			)}
 		</div>
 	);
 }

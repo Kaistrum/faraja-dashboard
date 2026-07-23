@@ -186,7 +186,10 @@ export function zoneIdFromCoords(lat: number, lon: number): string {
 
 // ─── Transform functions ──────────────────────────────────────────────────────
 
-export function rapidaReportToPoint(report: RapidaFinalReport): PointFeature | null {
+export function rapidaReportToPoint(
+  report: RapidaFinalReport,
+  assignment?: RapidaAssignment | null,
+): PointFeature | null {
   if (report.lat == null || report.lon == null) return null;
 
   const infrastructure_type = mapInfrastructureType(report.infrastructure_type);
@@ -201,9 +204,9 @@ export function rapidaReportToPoint(report: RapidaFinalReport): PointFeature | n
     disaster_type,
     damage_level,
     casualties: 0,
-    assigned: false,
-    assigned_to: null,
-    task_status: "unassigned",
+    assigned: assignment != null && assignment.status !== "completed" && assignment.status !== "cancelled",
+    assigned_to: assignment?.responder_name ?? null,
+    task_status: assignment ? mapAssignmentStatus(assignment.status) : "unassigned",
     report_summary: `${infrastructure_type} affected by ${report.nature_of_crisis ?? "unknown event"} — ${report.damage_level ?? "unknown"} damage.`,
     original_report_id: report.original_report_id ?? null,
   };
@@ -231,10 +234,14 @@ export function rapidaResponderToInternal(r: RapidaResponder): Responder {
 
 function mapAssignmentStatus(s: RapidaAssignment["status"]): TaskStatus {
   switch (s) {
-    case "in_progress": return "assigned";
     case "completed":
-    case "cancelled":   return "resolved";
-    default:            return "unassigned";
+    case "cancelled":     return "resolved";
+    // "pending" and "in_progress" both mean a responder has been assigned
+    // and is working the task — every RapidaAssignment already carries a
+    // responder, so there is no "unassigned" case here.
+    case "pending":
+    case "in_progress":
+    default:              return "assigned";
   }
 }
 

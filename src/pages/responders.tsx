@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
+import dynamic from "next/dynamic";
 import { Alert, Badge, Button, Card, Divider, Input, Spinner, Textarea } from "@kaistrum/stratum-ui";
 import { Center } from "@/components/ui/Center";
 import { Group, Stack } from "@/components/ui/Stack";
 import { Text } from "@/components/ui/Text";
-import { IconAlertTriangle, IconUserCheck } from "@tabler/icons-react";
+import { IconAlertTriangle, IconSearch, IconUserCheck } from "@tabler/icons-react";
 import Header from "@/components/Header";
 import type { DisasterType, PointFeature, Responder, ZoneFeature } from "@/types";
 import { canAssignToResponder, DAMAGE_COLORS, deriveAvailability } from "@/types";
+
+const ResponderMap = dynamic(() => import("@/components/ResponderMap"), { ssr: false });
 
 interface AuthUser {
 	id: string;
@@ -72,6 +75,8 @@ const AVAILABILITY_STYLES = {
 
 const AVATAR_CHIP =
 	"h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold";
+const AVATAR_CHIP_SM =
+	"h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0";
 const AVATAR_CHIP_STYLE = { background: "var(--bg-card)", color: "var(--text-dim)" } as const;
 
 // ── Priority computation ────────────────────────────────────────────────────────
@@ -135,6 +140,7 @@ export default function RespondersPage() {
 	const [user, setUser] = useState<AuthUser | null>(null);
 	const [checking, setChecking] = useState(true);
 	const [responders, setResponders] = useState<Responder[]>([]);
+	const [responderQuery, setResponderQuery] = useState("");
 	const [selectedResponder, setSelectedResponder] = useState<Responder | null>(null);
 	const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 	const [zoneData, setZoneData] = useState<ZoneFeature | null>(null);
@@ -399,6 +405,19 @@ export default function RespondersPage() {
 		? responderEligibility.get(selectedResponder.id) ?? null
 		: null;
 
+	const visibleResponders = useMemo(() => {
+		const needle = responderQuery.trim().toLowerCase();
+		if (!needle) return sortedResponders;
+		return sortedResponders.filter(
+			(r) => r.name.toLowerCase().includes(needle) || r.team.toLowerCase().includes(needle),
+		);
+	}, [sortedResponders, responderQuery]);
+
+	const handleMapSelect = (responder: Responder) => {
+		const info = responderEligibility.get(responder.id);
+		if (!info || info.eligible) setSelectedResponder(responder);
+	};
+
 	const assignButtonDisabled =
 		!selectedResponder ||
 		!zoneData ||
@@ -454,71 +473,94 @@ export default function RespondersPage() {
 			<Header user={user} />
 			<div className="flex flex-1 overflow-hidden p-4 gap-4">
 
-				{/* ── Left: responder list ─────────────────────────────────────────── */}
-				<div className="w-[55%] overflow-auto space-y-4">
-					<div className="flex items-center justify-between">
-						<Text fw={700} size="lg" style={{ color: "var(--text)" }}>Responders</Text>
-						<Badge>{responders.length}</Badge>
+				{/* ── Left: responder list (top) + map (bottom) ───────────────────── */}
+				<div className="w-[55%] flex flex-col overflow-hidden gap-3">
+
+					{/* Upper: search + compact responder list */}
+					<div className="flex flex-col overflow-hidden" style={{ height: "50%" }}>
+						<div className="flex items-center justify-between mb-2" style={{ flexShrink: 0 }}>
+							<Text fw={700} size="lg" style={{ color: "var(--text)" }}>Responders</Text>
+							<Badge>{visibleResponders.length}</Badge>
+						</div>
+						<Input
+							value={responderQuery}
+							onChange={(e) => setResponderQuery(e.target.value)}
+							placeholder="Search by name or team..."
+							leadingIcon={<IconSearch size={14} />}
+							style={{ flexShrink: 0, marginBottom: 8 }}
+						/>
+						<div className="overflow-auto" style={{ flex: 1, minHeight: 0 }}>
+							<Stack gap={6}>
+								{visibleResponders.map((responder) => {
+									const avail = deriveAvailability(responder);
+									const availStyle = AVAILABILITY_STYLES[avail];
+									const availLabel =
+										avail === "busy" ? `Busy (${responder.active_task_count}/5)`
+										: avail === "full" ? "Full (5/5)"
+										: avail === "offline" ? "Offline"
+										: "Available";
+									const eligInfo = responderEligibility.get(responder.id) ?? null;
+									const isIneligible = eligInfo !== null && !eligInfo.eligible;
+									const isSelected = selectedResponder?.id === responder.id;
+									const initials = responder.name.split(" ").map((p) => p[0]).join("");
+									return (
+										<Card
+											key={responder.id}
+											surface="surface"
+											padding="compact"
+											title={isIneligible ? eligInfo?.reason : undefined}
+											style={{
+												cursor: isIneligible ? "not-allowed" : "pointer",
+												opacity: isIneligible ? 0.5 : 1,
+												borderLeft: !isIneligible && avail === "available" ? "3px solid var(--success)" : undefined,
+												border: isSelected && !isIneligible ? "2px solid var(--accent)" : undefined,
+											}}
+											onClick={() => { if (!isIneligible) setSelectedResponder(responder); }}
+										>
+											<Group align="center" gap="sm">
+												<div className={AVATAR_CHIP_SM} style={AVATAR_CHIP_STYLE}>{initials}</div>
+												<div style={{ flex: 1, minWidth: 0 }}>
+													<Text fw={500} size="sm" truncate>{responder.name}</Text>
+													<Text size="xs" c="dimmed" truncate>{responder.team}</Text>
+												</div>
+												<Stack gap={2} align="flex-end">
+													<Badge style={{ backgroundColor: availStyle.bg, color: availStyle.color, border: 0 }}>
+														{availLabel}
+													</Badge>
+													{eligInfo !== null && (
+														<Badge
+															style={
+																eligInfo.eligible
+																	? { backgroundColor: "var(--accent-faint)", color: "var(--accent-strong)", border: 0 }
+																	: { backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: 0 }
+															}
+														>
+															{eligInfo.eligible
+																? `${eligInfo.distanceKm!.toFixed(1)} km away`
+																: eligInfo.reason}
+														</Badge>
+													)}
+												</Stack>
+											</Group>
+										</Card>
+									);
+								})}
+								{visibleResponders.length === 0 && (
+									<Text size="sm" c="dimmed" ta="center" mt="md">No responders match your search</Text>
+								)}
+							</Stack>
+						</div>
 					</div>
-					<Stack gap="sm">
-						{sortedResponders.map((responder) => {
-							const avail = deriveAvailability(responder);
-							const availStyle = AVAILABILITY_STYLES[avail];
-							const availLabel =
-								avail === "busy" ? `Busy (${responder.active_task_count}/5)`
-								: avail === "full" ? "Full (5/5)"
-								: avail === "offline" ? "Offline"
-								: "Available";
-							const eligInfo = responderEligibility.get(responder.id) ?? null;
-							const isIneligible = eligInfo !== null && !eligInfo.eligible;
-							const isSelected = selectedResponder?.id === responder.id;
-							const initials = responder.name.split(" ").map((p) => p[0]).join("");
-							return (
-								<Card
-									key={responder.id}
-									surface="surface"
-									padding="standard"
-									title={isIneligible ? eligInfo?.reason : undefined}
-									style={{
-										cursor: isIneligible ? "not-allowed" : "pointer",
-										opacity: isIneligible ? 0.5 : 1,
-										borderLeft: !isIneligible && avail === "available" ? "4px solid var(--success)" : undefined,
-										border: isSelected && !isIneligible ? "2px solid var(--accent)" : undefined,
-									}}
-									onClick={() => { if (!isIneligible) setSelectedResponder(responder); }}
-								>
-									<Group align="center" gap="md">
-										<div className={AVATAR_CHIP} style={AVATAR_CHIP_STYLE}>{initials}</div>
-										<div style={{ flex: 1 }}>
-											<Text fw={500}>{responder.name}</Text>
-											<Text size="xs" c="dimmed">{responder.team}</Text>
-										</div>
-										<Stack gap={4} align="flex-end">
-											<Badge style={{ backgroundColor: availStyle.bg, color: availStyle.color, border: 0 }}>
-												{availLabel}
-											</Badge>
-											{eligInfo !== null && (
-												<Badge
-													style={
-														eligInfo.eligible
-															? { backgroundColor: "var(--accent-faint)", color: "var(--accent-strong)", border: 0 }
-															: { backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: 0 }
-													}
-												>
-													{eligInfo.eligible
-														? `${eligInfo.distanceKm!.toFixed(1)} km away`
-														: eligInfo.reason}
-												</Badge>
-											)}
-											{responder.current_task_zone && (
-												<Text size="xs" c="dimmed">Zone {responder.current_task_zone}</Text>
-											)}
-										</Stack>
-									</Group>
-								</Card>
-							);
-						})}
-					</Stack>
+
+					{/* Lower: responder + incident map */}
+					<div style={{ flex: 1, minHeight: 0, border: "1px solid var(--border)", overflow: "hidden" }}>
+						<ResponderMap
+							responders={visibleResponders}
+							selectedResponder={selectedResponder}
+							zoneData={zoneData}
+							onSelectResponder={handleMapSelect}
+						/>
+					</div>
 				</div>
 
 				{/* ── Right: weights + assignment ─────────────────────────────────── */}

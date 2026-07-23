@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { PointFeature } from "@/types";
-import { fetchAllPages, rapidaReportToPoint, type RapidaFinalReport } from "@/lib/rapida";
+import { fetchAllPages, rapidaReportToPoint, type RapidaFinalReport, type RapidaAssignment } from "@/lib/rapida";
 
 const BASE = (process.env.RAPIDA_API_BASE ?? "").replace(/\/+$/, "");
 
@@ -12,9 +12,30 @@ async function getPoints(): Promise<PointFeature[]> {
   const now = Date.now();
   if (reportCache && reportCache.expiresAt > now) return reportCache.points;
 
-  const reports = await fetchAllPages<RapidaFinalReport>(`${BASE}/final-reports/`);
+  const [reports, assignments] = await Promise.all([
+    fetchAllPages<RapidaFinalReport>(`${BASE}/final-reports/`),
+    fetchAllPages<RapidaAssignment>(`${BASE}/assignments/`),
+  ]);
+
+  // A report can have more than one assignment over time (reassignment) —
+  // keep only the most recent one per report.
+  const latestAssignmentByReport = new Map<string, RapidaAssignment>();
+  for (const a of assignments) {
+    const existing = latestAssignmentByReport.get(a.report);
+    if (!existing || new Date(a.assigned_at) > new Date(existing.assigned_at)) {
+      latestAssignmentByReport.set(a.report, a);
+    }
+  }
+
   const points = reports
-    .map(rapidaReportToPoint)
+    .map((r) => {
+      // Assignments reference the original (pre-AI-processing) report id,
+      // not the final report's own id — match on that instead.
+      const assignment = r.original_report_id
+        ? (latestAssignmentByReport.get(r.original_report_id) ?? null)
+        : null;
+      return rapidaReportToPoint(r, assignment);
+    })
     .filter((p): p is PointFeature => p !== null);
 
   reportCache = { points, expiresAt: now + CACHE_TTL_MS };
