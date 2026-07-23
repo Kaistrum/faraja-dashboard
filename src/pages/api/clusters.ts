@@ -12,7 +12,7 @@ async function getPoints(): Promise<PointFeature[]> {
   const now = Date.now();
   if (reportCache && reportCache.expiresAt > now) return reportCache.points;
 
-  const reports = await fetchAllPages<RapidaFinalReport>(`${BASE}/reports/`);
+  const reports = await fetchAllPages<RapidaFinalReport>(`${BASE}/final-reports/`);
   const points = reports
     .map(rapidaReportToPoint)
     .filter((p): p is PointFeature => p !== null);
