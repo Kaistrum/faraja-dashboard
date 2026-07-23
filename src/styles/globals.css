@@ -1,0 +1,298 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+@import "@kaistrum/stratum-ui/styles/tokens.css";
+
+/* Stratum UI ships its component classNames (bg-bg-surface, text-text-dim, ...)
+   pre-baked into a compiled JS bundle under node_modules, which Tailwind v4
+   excludes from source detection by default — pull it back in explicitly so
+   those utility classes actually get generated. */
+@source "../../node_modules/@kaistrum/stratum-ui/dist-lib/index.js";
+
+/* ============================================================= *
+ *  FARAJA — Crisis Response Console
+ *  Built on the Kaistrum Stratum UI design system.
+ * ============================================================= */
+
+@font-face {
+	font-family: "DMSans";
+	src: url("/fonts/DMSans-Regular.ttf");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "DMSans";
+	src: url("/fonts/DMSans-Medium.ttf");
+	font-weight: 500;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "DMSans";
+	src: url("/fonts/DMSans-Bold.ttf");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Exodus";
+	src: url("/fonts/Exodus.ttf") format("truetype");
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	/* Faraja keeps its own brand typeface rather than Stratum's SF Pro stack. */
+	--font-sans: "DMSans", system-ui, sans-serif;
+}
+
+/* Sign-in always renders light, independent of the app-wide theme toggle.
+   Tokens.css only flips palettes via `:root.light`, which we can't scope to
+   a subtree — so redeclare the light values directly on this wrapper class
+   instead, shadowing the inherited (possibly dark) custom properties. */
+.theme-light-forced {
+	--bg:            #FFFFFF;
+	--bg-surface:    #F0F4FF;
+	--bg-card:       #F8FAFF;
+	--nav-bg:        rgba(255, 255, 255, 0.96);
+	--drop-bg:       #FFFFFF;
+	--overlay-bg:    rgba(10, 15, 46, 0.45);
+
+	--border:        rgba(10, 15, 46, 0.09);
+	--border-subtle: rgba(10, 15, 46, 0.05);
+	--border-strong: rgba(10, 15, 46, 0.18);
+
+	--text:          #0A0F2E;
+	--text-dim:      rgba(10, 15, 46, 0.65);
+	--text-muted:    rgba(10, 15, 46, 0.35);
+	--text-on-accent: #FFFFFF;
+	--text-on-danger: #FFFFFF;
+
+	--accent:        #005BCC;
+	--accent-dim:    rgba(0, 91, 204, 0.65);
+	--accent-faint:  rgba(0, 91, 204, 0.08);
+	--accent-strong: #0047A3;
+
+	--success:       #059669;
+	--success-faint: rgba(5, 150, 105, 0.08);
+	--warning:       #D97706;
+	--warning-faint: rgba(217, 119, 6, 0.08);
+	--danger:        #DC2626;
+	--danger-faint:  rgba(220, 38, 38, 0.08);
+	--info:          #0284C7;
+	--info-faint:    rgba(2, 132, 199, 0.08);
+
+	--shadow-sm: 0 1px 2px rgba(10, 15, 46, 0.06);
+	--shadow-md: 0 8px 24px rgba(10, 15, 46, 0.08);
+	--shadow-lg: 0 16px 48px rgba(10, 15, 46, 0.1);
+}
+
+/* Stratum's <Hero> hardcodes a black section background (bg-black) but
+   themes its title/subtitle off the shared --text tokens. In light mode
+   those tokens turn dark-navy, which renders as dark-on-black — invisible.
+   Hero's backdrop is never anything but black, so pin its text tokens to
+   the dark-mode palette regardless of the app-wide theme. */
+.theme-dark-forced {
+	--text:          #E2E8F0;
+	--text-dim:      rgba(226, 232, 240, 0.65);
+	--text-muted:    rgba(226, 232, 240, 0.35);
+
+	--accent:        #2DD4BF;
+	--accent-dim:    rgba(45, 212, 191, 0.65);
+	--accent-faint:  rgba(45, 212, 191, 0.10);
+	--accent-strong: #5EEAD4;
+}
+
+/* Stratum's <Navbar> hardcodes its bar at h-14 (56px) with no prop to change
+   it, which is too tight for the full Faraja lockup (icon + wordmark). The
+   bar is the header's first child — override its height with a selector
+   specific enough to beat the h-14 utility regardless of stylesheet order. */
+header.navbar-tall > div:first-child {
+	height: 5rem;
+}
+
+/* Map Stratum's tokens into Tailwind's theme so utilities like bg-bg-surface,
+   text-text-dim, border-border, etc. exist and stay in sync with tokens.css
+   automatically (mirrors @kaistrum/stratum-ui/styles/globals.css). */
+@theme inline {
+	--color-bg:            var(--bg);
+	--color-bg-surface:    var(--bg-surface);
+	--color-bg-card:       var(--bg-card);
+	--color-nav-bg:        var(--nav-bg);
+	--color-drop-bg:       var(--drop-bg);
+	--color-overlay-bg:    var(--overlay-bg);
+
+	--color-border:        var(--border);
+	--color-border-subtle: var(--border-subtle);
+	--color-border-strong: var(--border-strong);
+
+	--color-text:          var(--text);
+	--color-text-dim:      var(--text-dim);
+	--color-text-muted:    var(--text-muted);
+	--color-text-on-accent: var(--text-on-accent);
+	--color-text-on-danger: var(--text-on-danger);
+
+	--color-accent:        var(--accent);
+	--color-accent-dim:    var(--accent-dim);
+	--color-accent-faint:  var(--accent-faint);
+	--color-accent-strong: var(--accent-strong);
+
+	--color-success:       var(--success);
+	--color-success-faint: var(--success-faint);
+	--color-warning:       var(--warning);
+	--color-warning-faint: var(--warning-faint);
+	--color-danger:        var(--danger);
+	--color-danger-faint:  var(--danger-faint);
+	--color-info:          var(--info);
+	--color-info-faint:    var(--info-faint);
+
+	--radius-none: var(--radius-none);
+	--radius-sm:   var(--radius-sm);
+	--radius-md:   var(--radius-md);
+	--radius-lg:   var(--radius-lg);
+	--radius-full: var(--radius-full);
+
+	--font-sans:  var(--font-sans);
+	--font-serif: var(--font-serif);
+
+	--ease-brand:    var(--ease-brand);
+	--ease-standard: var(--ease-standard);
+
+	--shadow-sm: var(--shadow-sm);
+	--shadow-md: var(--shadow-md);
+	--shadow-lg: var(--shadow-lg);
+}
+
+* {
+	-webkit-font-smoothing: antialiased;
+}
+
+body {
+	font-family: var(--font-sans);
+	font-weight: 400;
+	color: var(--text);
+	background-color: var(--bg);
+	transition: background-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard);
+}
+
+/* ---------- Atoms ---------- */
+.tnum,
+.metric-value {
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+}
+
+.section-label {
+	font-size: 10.5px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.metric-value {
+	font-weight: 700;
+	color: var(--text);
+	line-height: 1;
+}
+
+.icon-chip {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bg-card);
+	color: var(--text-dim);
+	flex-shrink: 0;
+}
+
+/* Native range sliders adopt the brand accent + a themed track */
+input[type="range"] {
+	accent-color: var(--accent);
+	cursor: pointer;
+	height: 6px;
+}
+
+.hoverable {
+	transition: background 0.16s var(--ease-standard), border-color 0.16s var(--ease-standard),
+		transform 0.16s var(--ease-standard);
+}
+.hoverable:hover {
+	background: var(--bg-card);
+	border-color: var(--border-strong);
+}
+
+.rail-critical { box-shadow: inset 3px 0 0 0 var(--danger); }
+.rail-medium { box-shadow: inset 3px 0 0 0 var(--warning); }
+.rail-low { box-shadow: inset 3px 0 0 0 var(--success); }
+
+/* ---------- Motion (subtle) ---------- */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes dotFlash {
+	0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+	30% { opacity: 1; transform: translateY(-2px); }
+}
+
+.anim-fade { animation: fadeIn 0.28s var(--ease-brand) both; }
+.anim-rise { animation: slideUp 0.3s var(--ease-brand) both; }
+
+.stagger > * { animation: slideUp 0.3s var(--ease-brand) both; }
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.stagger > *:nth-child(3) { animation-delay: 0.08s; }
+.stagger > *:nth-child(4) { animation-delay: 0.11s; }
+.stagger > *:nth-child(5) { animation-delay: 0.14s; }
+.stagger > *:nth-child(6) { animation-delay: 0.17s; }
+.stagger > *:nth-child(7) { animation-delay: 0.2s; }
+.stagger > *:nth-child(8) { animation-delay: 0.23s; }
+
+@media (prefers-reduced-motion: reduce) {
+	*, .stagger > * { animation: none !important; transition: none !important; }
+}
+
+/* ---------- Scrollbars ---------- */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+	background: var(--border-strong);
+	border-radius: 99px;
+	border: 3px solid transparent;
+	background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: content-box; }
+
+/* Stratum UI's <Hero> unconditionally renders a .noise-overlay div; this app
+   only imports tokens.css (not Stratum's full globals.css, to avoid an
+   external Google Fonts fetch), so the class is defined locally instead. */
+.noise-overlay {
+	position: absolute;
+	inset: 0;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+/* ---------- Leaflet ---------- */
+.leaflet-container {
+	width: 100%;
+	height: 100%;
+	font-family: var(--font-sans);
+	background: var(--bg-card);
+}
+.leaflet-popup-content-wrapper {
+	box-shadow: var(--shadow-lg);
+	border: 1px solid var(--border);
+	background: var(--bg-surface);
+	color: var(--text);
+	padding: 2px;
+}
+.leaflet-popup-tip { background: var(--bg-surface); box-shadow: var(--shadow-sm); }
+.leaflet-control-zoom a {
+	color: var(--text-dim) !important;
+	background: var(--bg-surface) !important;
+	border-color: var(--border) !important;
+}
+.leaflet-bar { border: none !important; box-shadow: var(--shadow-sm); overflow: hidden; }
+/* Make room for the basemap switcher stacked above the zoom control */
+.leaflet-top.leaflet-left .leaflet-control-zoom { margin-top: 50px; }
+
+.crisis-pin { animation: fadeIn 0.25s var(--ease-brand) both; }
