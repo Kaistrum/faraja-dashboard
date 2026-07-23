@@ -222,8 +222,8 @@ export function rapidaResponderToInternal(r: RapidaResponder): Responder {
     team: r.organization,
     status: r.is_active ? "available" : "offline",
     current_task_zone: null,
-    lat: r.location?.coordinates[1] ?? 0,
-    lng: r.location?.coordinates[0] ?? 0,
+    lat: r.location?.coordinates[1] ?? null,
+    lng: r.location?.coordinates[0] ?? null,
     active_task_count: 0,
     max_tasks: 5,
   };

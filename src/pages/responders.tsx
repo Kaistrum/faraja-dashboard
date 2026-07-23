@@ -387,11 +387,11 @@ export default function RespondersPage() {
 			});
 		}
 		return [...responders].sort((a, b) => {
-			const aInfo = responderEligibility.get(a.id) ?? { eligible: false, distanceKm: 9999 };
-			const bInfo = responderEligibility.get(b.id) ?? { eligible: false, distanceKm: 9999 };
+			const aInfo = responderEligibility.get(a.id) ?? { eligible: false, distanceKm: null };
+			const bInfo = responderEligibility.get(b.id) ?? { eligible: false, distanceKm: null };
 			if (aInfo.eligible && !bInfo.eligible) return -1;
 			if (!aInfo.eligible && bInfo.eligible) return 1;
-			return aInfo.distanceKm - bInfo.distanceKm;
+			return (aInfo.distanceKm ?? Infinity) - (bInfo.distanceKm ?? Infinity);
 		});
 	}, [responders, zoneData, zoneLat, zoneLng, responderEligibility]);
 
@@ -506,8 +506,8 @@ export default function RespondersPage() {
 													}
 												>
 													{eligInfo.eligible
-														? `In range · ${eligInfo.distanceKm.toFixed(1)} km`
-														: `Out of range · ${eligInfo.distanceKm.toFixed(1)} km`}
+														? `${eligInfo.distanceKm!.toFixed(1)} km away`
+														: eligInfo.reason}
 												</Badge>
 											)}
 											{responder.current_task_zone && (

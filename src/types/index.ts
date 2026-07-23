@@ -96,8 +96,8 @@ export interface Responder {
   team: string;
   status: "available" | "busy" | "offline";
   current_task_zone: string | null;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   active_task_count: number;
   max_tasks: number;
 }
@@ -134,7 +134,14 @@ export function canAssignToResponder(
   responder: Responder,
   zoneLat: number,
   zoneLng: number
-): { eligible: boolean; reason: string; distanceKm: number } {
+): { eligible: boolean; reason: string; distanceKm: number | null } {
+  if (responder.status === "offline")
+    return { eligible: false, reason: "Responder is offline", distanceKm: null };
+  if (deriveAvailability(responder) === "full")
+    return { eligible: false, reason: "At capacity (5/5 tasks)", distanceKm: null };
+  if (responder.lat == null || responder.lng == null)
+    return { eligible: false, reason: "Location unknown", distanceKm: null };
+
   const R = 6371;
   const dLat = ((zoneLat - responder.lat) * Math.PI) / 180;
   const dLng = ((zoneLng - responder.lng) * Math.PI) / 180;
@@ -144,12 +151,5 @@ export function canAssignToResponder(
       Math.cos((zoneLat * Math.PI) / 180) *
       Math.sin(dLng / 2) ** 2;
   const distanceKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const RADIUS_KM = 10;
-  if (responder.status === "offline")
-    return { eligible: false, reason: "Responder is offline", distanceKm };
-  if (distanceKm > RADIUS_KM)
-    return { eligible: false, reason: `Out of range (${distanceKm.toFixed(1)} km away)`, distanceKm };
-  if (deriveAvailability(responder) === "full")
-    return { eligible: false, reason: "At capacity (5/5 tasks)", distanceKm };
-  return { eligible: true, reason: `In range · ${distanceKm.toFixed(1)} km away`, distanceKm };
+  return { eligible: true, reason: `${distanceKm.toFixed(1)} km away`, distanceKm };
 }
