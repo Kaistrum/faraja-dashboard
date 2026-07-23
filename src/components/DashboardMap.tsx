@@ -405,7 +405,7 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 
 		async function loadPoints() {
 			try {
-				const res = await fetch("/api/clusters?bbox=34,-3,42,2", { signal: controller.signal });
+				const res = await fetch("/api/clusters", { signal: controller.signal });
 				if (!res.ok) return;
 				const data = (await res.json()) as { points?: PointFeatureExtended[] };
 				const fetchedPoints = data.points ?? [];

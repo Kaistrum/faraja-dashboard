@@ -138,7 +138,7 @@ export default function IncidentsPage() {
 		const fetchIncidents = async () => {
 			setLoading(true);
 			try {
-				const res = await fetch("/api/clusters?bbox=34,-3,42,2");
+				const res = await fetch("/api/clusters");
 				if (res.ok) {
 					const data = await res.json();
 					if (mounted) setPoints((data.points ?? []) as PointFeature[]);

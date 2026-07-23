@@ -225,7 +225,7 @@ export default function RespondersPage() {
 		const loadZone = async () => {
 			setLoadingZone(true);
 			try {
-				const res = await fetch("/api/clusters?bbox=34,-3,42,2");
+				const res = await fetch("/api/clusters");
 				if (res.ok) {
 					const data = await res.json();
 					const allPoints = (data.points ?? []) as PointFeature[];
@@ -256,7 +256,7 @@ export default function RespondersPage() {
 		}
 		const fetchPoint = async () => {
 			try {
-				const res = await fetch("/api/clusters?bbox=34,-3,42,2");
+				const res = await fetch("/api/clusters");
 				if (res.ok) {
 					const data = await res.json();
 					const pts = (data.points ?? []) as PointFeature[];
