@@ -1,9 +1,11 @@
 import { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Responder, ZoneFeature } from "@/types";
 import { DAMAGE_COLORS, deriveAvailability } from "@/types";
+import { DISASTER_ICON } from "@/components/icons";
 
 const AVAILABILITY_MARKER_COLOR: Record<string, string> = {
 	available: "#059669",
@@ -25,12 +27,15 @@ function responderIcon(responder: Responder, selected: boolean): L.DivIcon {
 	});
 }
 
-function zoneIcon(color: string): L.DivIcon {
+function zoneIcon(zone: ZoneFeature): L.DivIcon {
+	const color = DAMAGE_COLORS[zone.properties.tier] ?? "#8d897d";
+	const Comp = DISASTER_ICON[zone.properties.dominant_disaster] ?? DISASTER_ICON.Other;
+	const glyph = renderToStaticMarkup(<Comp size={17} color="#ffffff" stroke={2.2} />);
 	return L.divIcon({
 		className: "",
-		html: `<div style="width:16px;height:16px;background:${color};border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);transform:rotate(45deg);"></div>`,
-		iconSize: [16, 16],
-		iconAnchor: [8, 8],
+		html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">${glyph}</div>`,
+		iconSize: [32, 32],
+		iconAnchor: [16, 16],
 	});
 }
 
@@ -75,11 +80,21 @@ export default function ResponderMap({ responders, selectedResponder, zoneData, 
 			/>
 			<FitBounds points={boundsPoints} />
 
-			{zoneLat != null && zoneLng != null && (
-				<Marker
-					position={[zoneLat, zoneLng]}
-					icon={zoneIcon(DAMAGE_COLORS[zoneData!.properties.tier] ?? "var(--text-muted)")}
-				/>
+			{zoneLat != null && zoneLng != null && zoneData && (
+				<Marker position={[zoneLat, zoneLng]} icon={zoneIcon(zoneData)}>
+					<Popup minWidth={200}>
+						<div style={{ fontSize: 13 }}>
+							<div style={{ fontWeight: 700, marginBottom: 4 }}>{zoneData.properties.label}</div>
+							<div style={{ marginBottom: 2 }}>
+								<strong>{zoneData.properties.tier}</strong> severity · {zoneData.properties.dominant_disaster}
+							</div>
+							<div style={{ color: "#666" }}>
+								{zoneData.properties.count} report{zoneData.properties.count === 1 ? "" : "s"}
+								{zoneData.properties.casualties > 0 ? ` · ${zoneData.properties.casualties} casualties` : ""}
+							</div>
+						</div>
+					</Popup>
+				</Marker>
 			)}
 
 			{located.map((r) => (

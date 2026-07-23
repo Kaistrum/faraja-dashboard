@@ -77,6 +77,8 @@ const AVATAR_CHIP =
 	"h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold";
 const AVATAR_CHIP_SM =
 	"h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0";
+const AVATAR_CHIP_XS =
+	"h-6 w-6 rounded-full flex items-center justify-center shrink-0";
 const AVATAR_CHIP_STYLE = { background: "var(--bg-card)", color: "var(--text-dim)" } as const;
 
 // ── Priority computation ────────────────────────────────────────────────────────
@@ -490,7 +492,7 @@ export default function RespondersPage() {
 							style={{ flexShrink: 0, marginBottom: 8 }}
 						/>
 						<div className="overflow-auto" style={{ flex: 1, minHeight: 0 }}>
-							<Stack gap={6}>
+							<Stack gap={4}>
 								{visibleResponders.map((responder) => {
 									const avail = deriveAvailability(responder);
 									const availStyle = AVAILABILITY_STYLES[avail];
@@ -507,21 +509,22 @@ export default function RespondersPage() {
 										<Card
 											key={responder.id}
 											surface="surface"
-											padding="compact"
+											padding="none"
 											title={isIneligible ? eligInfo?.reason : undefined}
 											style={{
 												cursor: isIneligible ? "not-allowed" : "pointer",
 												opacity: isIneligible ? 0.5 : 1,
+												padding: "6px 10px",
 												borderLeft: !isIneligible && avail === "available" ? "3px solid var(--success)" : undefined,
 												border: isSelected && !isIneligible ? "2px solid var(--accent)" : undefined,
 											}}
 											onClick={() => { if (!isIneligible) setSelectedResponder(responder); }}
 										>
-											<Group align="center" gap="sm">
-												<div className={AVATAR_CHIP_SM} style={AVATAR_CHIP_STYLE}>{initials}</div>
+											<Group align="center" gap="xs">
+												<div className={AVATAR_CHIP_XS} style={{ ...AVATAR_CHIP_STYLE, fontSize: 9, fontWeight: 700 }}>{initials}</div>
 												<div style={{ flex: 1, minWidth: 0 }}>
-													<Text fw={500} size="sm" truncate>{responder.name}</Text>
-													<Text size="xs" c="dimmed" truncate>{responder.team}</Text>
+													<Text fw={500} size="sm" truncate style={{ lineHeight: 1.25 }}>{responder.name}</Text>
+													<Text size="xs" c="dimmed" truncate style={{ lineHeight: 1.2 }}>{responder.team}</Text>
 												</div>
 												<Stack gap={2} align="flex-end">
 													<Badge style={{ backgroundColor: availStyle.bg, color: availStyle.color, border: 0 }}>
