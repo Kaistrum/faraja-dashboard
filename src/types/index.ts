@@ -68,6 +68,12 @@ export interface PointProperties {
   task_status: TaskStatus;
   report_summary: string;
   original_report_id: string | null;
+  submitted_at: string;
+  /** Raw AI classification from the backend model — distinct from the
+   *  human-reported disaster_type/damage_level above, which may fall
+   *  back to human-entered fields when the AI didn't classify a report. */
+  ai_disaster_type: string | null;
+  ai_damage_severity: string | null;
 }
 
 export type PointFeature = GeoJSON.Feature<GeoJSON.Point, PointProperties>;
@@ -121,6 +127,15 @@ export interface SeveritySummary {
   pct_partial: number;
   pct_minimal: number;
   total_reports: number;
+}
+
+/** "little_or_no_damage" → "Little or no damage" */
+export function formatAiLabel(raw: string | null): string | null {
+  if (!raw) return null;
+  return raw
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 export function deriveAvailability(r: Responder): ResponderAvailability {

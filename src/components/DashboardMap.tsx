@@ -13,8 +13,8 @@ import { Popover } from "@/components/ui/Popover";
 import { IconArrowRight, IconFileText, IconStack2, IconChevronDown, IconMap, IconCheck } from "@tabler/icons-react";
 import { useRouter } from "next/router";
 import type { ZoneFeature, PointFeature, DisasterType, DamageLevel } from "@/types";
-import { DAMAGE_COLORS } from "@/types";
-import { DISASTER_ICON, DisasterGlyph } from "@/components/icons";
+import { DAMAGE_COLORS, formatAiLabel } from "@/types";
+import { DISASTER_ICON, DisasterGlyph, FarajaMark } from "@/components/icons";
 
 const LEGEND_DISASTERS: DisasterType[] = [
 	"Flood", "Fire", "Chemical", "Landslide", "Earthquake",
@@ -554,12 +554,13 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 					</div>
 				</div>
 			)}
-			<MapContainer center={[-0.8, 37.5]} zoom={8} style={{ height: "100%", width: "100%", zIndex: 10 }}>
+			<MapContainer center={[-0.8, 37.5]} zoom={8} maxZoom={19} style={{ height: "100%", width: "100%", zIndex: 10 }}>
 				<TileLayer
 					key={activeBasemap.id}
 					url={activeBasemap.url}
 					subdomains={activeBasemap.subdomains}
 					attribution={activeBasemap.attribution}
+					maxZoom={19}
 				/>
 				{onVisiblePointsChange && (
 					<ViewportTracker allPoints={points} onChange={onVisiblePointsChange} />
@@ -573,6 +574,7 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 					animateAddingMarkers={false}
 					maxClusterRadius={220}
 					spiderfyOnMaxZoom
+					disableClusteringAtZoom={18}
 					eventHandlers={{ clusterclick: handleClusterClick } as any}
 				>
 					{points.map((pt) => {
@@ -586,10 +588,7 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 								alt={pt.properties.damage_level}
 								title={pt.properties.point_id}
 								eventHandlers={{
-									click: (e) => {
-										e.originalEvent.stopPropagation();
-										handlePointClick(pt);
-									},
+									click: () => handlePointClick(pt),
 									popupopen: () => setOpenPopupId(pt.properties.point_id),
 									popupclose: () => setOpenPopupId((prev) => (prev === pt.properties.point_id ? null : prev)),
 								}}
@@ -621,6 +620,19 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 											<Text size="xs" c="dimmed">Infrastructure type</Text>
 											<Text size="xs" fw={500}>{pt.properties.infrastructure_type}</Text>
 										</div>
+										{(pt.properties.ai_disaster_type || pt.properties.ai_damage_severity) && (
+											<div style={{ background: "var(--bg-card)", padding: "6px 8px" }}>
+												<div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+													<FarajaMark size={14} />
+													<Text size="xs" fw={700}>Faraja's assessment</Text>
+												</div>
+												<Text size="xs" c="dimmed">
+													{[formatAiLabel(pt.properties.ai_disaster_type), formatAiLabel(pt.properties.ai_damage_severity)]
+														.filter(Boolean)
+														.join(" · ")}
+												</Text>
+											</div>
+										)}
 										{pt.properties.assigned ? (
 											<Badge style={{ backgroundColor: "var(--success-faint)", color: "var(--success)", border: 0 }}>
 												Assigned to {pt.properties.assigned_to}

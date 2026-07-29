@@ -6,7 +6,7 @@ import { Center } from "@/components/ui/Center";
 import { Group } from "@/components/ui/Stack";
 import { Table } from "@/components/ui/Table";
 import { Text } from "@/components/ui/Text";
-import { IconSearch } from "@tabler/icons-react";
+import { IconSearch, IconArrowUp, IconArrowDown } from "@tabler/icons-react";
 import Header from "@/components/Header";
 import type { DamageLevel, DisasterType, InfrastructureType, PointFeature, TaskStatus } from "@/types";
 import { DAMAGE_COLORS, DISASTER_COLORS } from "@/types";
@@ -33,19 +33,6 @@ const COUNTY_BY_ZONE: Record<string, string> = {
 	"Z-008": "Nairobi",
 	"Z-009": "Nairobi",
 	"Z-010": "Kiambu",
-};
-
-const DATE_BY_ZONE: Record<string, string> = {
-	"Z-001": "2026-06-23",
-	"Z-002": "2026-06-23",
-	"Z-003": "2026-06-22",
-	"Z-004": "2026-06-22",
-	"Z-005": "2026-06-21",
-	"Z-006": "2026-06-21",
-	"Z-007": "2026-06-20",
-	"Z-008": "2026-06-20",
-	"Z-009": "2026-06-19",
-	"Z-010": "2026-06-19",
 };
 
 const STATUS_STYLES: Record<TaskStatus, { label: string; bg: string; color: string }> = {
@@ -104,8 +91,10 @@ function countyFor(point: PointFeature) {
 	return COUNTY_BY_ZONE[point.properties.zone_id] ?? "Nairobi";
 }
 
-function reportDateFor(point: PointFeature) {
-	return DATE_BY_ZONE[point.properties.zone_id] ?? "2026-06-23";
+function formatDate(iso: string) {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "—";
+	return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 export default function IncidentsPage() {
@@ -122,6 +111,7 @@ export default function IncidentsPage() {
 	const [disasterType, setDisasterType] = useState<DisasterType | null>(null);
 	const [status, setStatus] = useState<TaskStatus | null>(null);
 	const [selectedIncident, setSelectedIncident] = useState<PointFeature | null>(null);
+	const [dateSortDir, setDateSortDir] = useState<"desc" | "asc">("desc");
 
 	useEffect(() => {
 		const raw = localStorage.getItem("auth_user");
@@ -202,6 +192,14 @@ export default function IncidentsPage() {
 		});
 	}, [points, query, county, severity, infrastructure, casualties, disasterType, status]);
 
+	const sorted = useMemo(() => {
+		return [...filtered].sort((a, b) => {
+			const da = new Date(a.properties.submitted_at).getTime();
+			const db = new Date(b.properties.submitted_at).getTime();
+			return dateSortDir === "desc" ? db - da : da - db;
+		});
+	}, [filtered, dateSortDir]);
+
 	if (checking || !user) {
 		return (
 			<Center style={{ height: "100vh" }}>
@@ -270,80 +268,88 @@ export default function IncidentsPage() {
 					</div>
 
 					<Card surface="surface" padding="none" style={{ overflow: "hidden" }}>
-						<Table>
-							<Table.Thead>
-								<Table.Tr>
-									<Table.Th>ID</Table.Th>
-									<Table.Th>Location</Table.Th>
-									<Table.Th>Infrastructure</Table.Th>
-									<Table.Th>County</Table.Th>
-									<Table.Th>Crisis type</Table.Th>
-									<Table.Th>Severity</Table.Th>
-									<Table.Th>Casualties</Table.Th>
-									<Table.Th>Assigned To</Table.Th>
-									<Table.Th>Status</Table.Th>
-									<Table.Th>Date</Table.Th>
-									<Table.Th>Description</Table.Th>
-								</Table.Tr>
-							</Table.Thead>
-							<Table.Tbody>
-								{loading ? (
+						<div style={{ maxHeight: "60vh", overflow: "auto" }}>
+							<Table>
+								<Table.Thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
 									<Table.Tr>
-										<Table.Td colSpan={11}>
-											<Center style={{ padding: "32px 0" }}><Spinner size={18} /></Center>
-										</Table.Td>
+										<Table.Th>Location</Table.Th>
+										<Table.Th>Infrastructure</Table.Th>
+										<Table.Th>County</Table.Th>
+										<Table.Th>Crisis type</Table.Th>
+										<Table.Th>Severity</Table.Th>
+										<Table.Th>Casualties</Table.Th>
+										<Table.Th>Assigned To</Table.Th>
+										<Table.Th>Status</Table.Th>
+										<Table.Th
+											onClick={() => setDateSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+											style={{ cursor: "pointer", userSelect: "none" }}
+										>
+											<span className="inline-flex items-center gap-1">
+												Date
+												{dateSortDir === "desc" ? <IconArrowDown size={12} /> : <IconArrowUp size={12} />}
+											</span>
+										</Table.Th>
+										<Table.Th>Description</Table.Th>
 									</Table.Tr>
-								) : filtered.length === 0 ? (
-									<Table.Tr>
-										<Table.Td colSpan={11}>
-											<Text ta="center" c="dimmed" style={{ padding: "32px 0" }}>No incidents match the current filters</Text>
-										</Table.Td>
-									</Table.Tr>
-								) : (
-									filtered.map((point) => {
-										const props = point.properties;
-										const statusStyle = STATUS_STYLES[props.task_status];
-										return (
-											<Table.Tr
-												key={props.point_id}
-												onClick={() => setSelectedIncident(point)}
-												style={{ cursor: "pointer" }}
-											>
-												<Table.Td className="tnum" style={{ fontWeight: 600 }}>{props.point_id.replace("P-", "INC-")}</Table.Td>
-												<Table.Td style={{ minWidth: 220 }}>{props.infrastructure_name}</Table.Td>
-												<Table.Td>
-													<Chip bg="var(--border-strong)" color="var(--text)">
-														{props.infrastructure_type as InfrastructureType}
-													</Chip>
-												</Table.Td>
-												<Table.Td>{countyFor(point)}</Table.Td>
-												<Table.Td>
-													<Chip bg={DISASTER_COLORS[props.disaster_type]} color="#fff">
-														{props.disaster_type}
-													</Chip>
-												</Table.Td>
-												<Table.Td>
-													<Chip bg={DAMAGE_COLORS[props.damage_level]} color="#fff">
-														{props.damage_level}
-													</Chip>
-												</Table.Td>
-												<Table.Td className="tnum">{props.casualties}</Table.Td>
-												<Table.Td style={{ minWidth: 140 }}>{props.assigned_to ?? "-"}</Table.Td>
-												<Table.Td>
-													<Chip bg={statusStyle.bg} color={statusStyle.color}>
-														{statusStyle.label}
-													</Chip>
-												</Table.Td>
-												<Table.Td className="tnum" style={{ whiteSpace: "nowrap" }}>{reportDateFor(point)}</Table.Td>
-												<Table.Td style={{ minWidth: 310, maxWidth: 460 }}>
-													<Text size="sm" lineClamp={2}>{props.report_summary}</Text>
-												</Table.Td>
-											</Table.Tr>
-										);
-									})
-								)}
-							</Table.Tbody>
-						</Table>
+								</Table.Thead>
+								<Table.Tbody>
+									{loading ? (
+										<Table.Tr>
+											<Table.Td colSpan={10}>
+												<Center style={{ padding: "32px 0" }}><Spinner size={18} /></Center>
+											</Table.Td>
+										</Table.Tr>
+									) : sorted.length === 0 ? (
+										<Table.Tr>
+											<Table.Td colSpan={10}>
+												<Text ta="center" c="dimmed" style={{ padding: "32px 0" }}>No incidents match the current filters</Text>
+											</Table.Td>
+										</Table.Tr>
+									) : (
+										sorted.map((point) => {
+											const props = point.properties;
+											const statusStyle = STATUS_STYLES[props.task_status];
+											return (
+												<Table.Tr
+													key={props.point_id}
+													onClick={() => setSelectedIncident(point)}
+													style={{ cursor: "pointer" }}
+												>
+													<Table.Td style={{ minWidth: 220 }}>{props.infrastructure_name}</Table.Td>
+													<Table.Td>
+														<Chip bg="var(--border-strong)" color="var(--text)">
+															{props.infrastructure_type as InfrastructureType}
+														</Chip>
+													</Table.Td>
+													<Table.Td>{countyFor(point)}</Table.Td>
+													<Table.Td>
+														<Chip bg={DISASTER_COLORS[props.disaster_type]} color="#fff">
+															{props.disaster_type}
+														</Chip>
+													</Table.Td>
+													<Table.Td>
+														<Chip bg={DAMAGE_COLORS[props.damage_level]} color="#fff">
+															{props.damage_level}
+														</Chip>
+													</Table.Td>
+													<Table.Td className="tnum">{props.casualties}</Table.Td>
+													<Table.Td style={{ minWidth: 140 }}>{props.assigned_to ?? "-"}</Table.Td>
+													<Table.Td>
+														<Chip bg={statusStyle.bg} color={statusStyle.color}>
+															{statusStyle.label}
+														</Chip>
+													</Table.Td>
+													<Table.Td className="tnum" style={{ whiteSpace: "nowrap" }}>{formatDate(props.submitted_at)}</Table.Td>
+													<Table.Td style={{ minWidth: 310, maxWidth: 460 }}>
+														<Text size="sm" lineClamp={2}>{props.report_summary}</Text>
+													</Table.Td>
+												</Table.Tr>
+											);
+										})
+									)}
+								</Table.Tbody>
+							</Table>
+						</div>
 					</Card>
 
 					<Group gap="xs" mt="sm">

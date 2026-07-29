@@ -7,9 +7,9 @@ import { Badge, Button } from "@kaistrum/stratum-ui";
 import { Group, Stack } from "@/components/ui/Stack";
 import { Text } from "@/components/ui/Text";
 import { IconX, IconArrowRight, IconAlertTriangle } from "@tabler/icons-react";
-import { DISASTER_ICON, DisasterGlyph } from "@/components/icons";
+import { DISASTER_ICON, DisasterGlyph, FarajaMark } from "@/components/icons";
 import type { DisasterType, PointFeature, TaskStatus } from "@/types";
-import { DAMAGE_COLORS, DISASTER_COLORS } from "@/types";
+import { DAMAGE_COLORS, DISASTER_COLORS, formatAiLabel } from "@/types";
 
 const STATUS_STYLES: Record<TaskStatus, { label: string; bg: string; color: string }> = {
 	assigned: { label: "Assigned", bg: "var(--accent-faint)", color: "var(--accent-strong)" },
@@ -141,6 +141,20 @@ export default function IncidentDrawer({ point, onClose }: IncidentDrawerProps) 
 							<Text size="xs" c="dimmed">Summary</Text>
 							<Text size="sm" mt={2}>{props.report_summary}</Text>
 						</div>
+
+						{(props.ai_disaster_type || props.ai_damage_severity) && (
+							<div style={{ background: "var(--bg-card)", padding: "10px 12px" }}>
+								<Group gap={6} align="center" style={{ marginBottom: 4 }}>
+									<FarajaMark size={16} />
+									<Text size="sm" fw={700}>Faraja's assessment</Text>
+								</Group>
+								<Text size="sm" c="dimmed">
+									{[formatAiLabel(props.ai_disaster_type), formatAiLabel(props.ai_damage_severity)]
+										.filter(Boolean)
+										.join(" · ")}
+								</Text>
+							</div>
+						)}
 
 						<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px" }}>
 							<div>

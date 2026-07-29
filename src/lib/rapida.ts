@@ -209,6 +209,9 @@ export function rapidaReportToPoint(
     task_status: assignment ? mapAssignmentStatus(assignment.status) : "unassigned",
     report_summary: `${infrastructure_type} affected by ${report.nature_of_crisis ?? "unknown event"} — ${report.damage_level ?? "unknown"} damage.`,
     original_report_id: report.original_report_id ?? null,
+    submitted_at: report.submitted_at,
+    ai_disaster_type: report.ai_disaster_type,
+    ai_damage_severity: report.ai_damage_severity,
   };
 
   return {
