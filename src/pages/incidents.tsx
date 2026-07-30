@@ -1,15 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
-import { Badge, Card, Input, Select, Spinner } from "@kaistrum/stratum-ui";
+import { Alert, Badge, Card, Input, Select, Spinner } from "@kaistrum/stratum-ui";
 import { Center } from "@/components/ui/Center";
 import { Group } from "@/components/ui/Stack";
+import { Menu } from "@/components/ui/Menu";
 import { Table } from "@/components/ui/Table";
 import { Text } from "@/components/ui/Text";
-import { IconSearch, IconArrowUp, IconArrowDown } from "@tabler/icons-react";
+import { IconSearch, IconArrowUp, IconArrowDown, IconChevronDown, IconDownload } from "@tabler/icons-react";
 import Header from "@/components/Header";
 import type { DamageLevel, DisasterType, InfrastructureType, PointFeature, TaskStatus } from "@/types";
 import { DAMAGE_COLORS, DISASTER_COLORS } from "@/types";
+import {
+	buildIncidentExport,
+	downloadBlob,
+	EXPORT_FORMATS,
+	toIncidentRows,
+	type ExportFormat,
+} from "@/lib/incidentExport";
 
 const IncidentDrawer = dynamic(() => import("@/components/IncidentDrawer"), { ssr: false });
 
@@ -112,6 +120,7 @@ export default function IncidentsPage() {
 	const [status, setStatus] = useState<TaskStatus | null>(null);
 	const [selectedIncident, setSelectedIncident] = useState<PointFeature | null>(null);
 	const [dateSortDir, setDateSortDir] = useState<"desc" | "asc">("desc");
+	const [exportNotice, setExportNotice] = useState<{ variant: "success" | "warning"; message: string } | null>(null);
 
 	useEffect(() => {
 		const raw = localStorage.getItem("auth_user");
@@ -200,6 +209,33 @@ export default function IncidentsPage() {
 		});
 	}, [filtered, dateSortDir]);
 
+	// Exports what the table currently shows — filters and sort included — so
+	// the file always matches what the operator is looking at.
+	const handleExport = (format: ExportFormat) => {
+		const chosen = EXPORT_FORMATS.find((f) => f.value === format);
+		try {
+			const rows = toIncidentRows(sorted, countyFor);
+			const { blob, filename, skipped } = buildIncidentExport(format, rows);
+			downloadBlob(blob, filename);
+			setExportNotice(
+				skipped > 0
+					? {
+							variant: "warning",
+							message: `Exported ${rows.length - skipped} of ${rows.length} incidents as ${chosen?.label}. ${skipped} skipped — a Shapefile point cannot store a missing coordinate.`,
+						}
+					: {
+							variant: "success",
+							message: `Exported ${rows.length} ${rows.length === 1 ? "incident" : "incidents"} as ${chosen?.label} (${filename}).`,
+						},
+			);
+		} catch (err) {
+			setExportNotice({
+				variant: "warning",
+				message: `Export failed: ${err instanceof Error ? err.message : "unknown error"}`,
+			});
+		}
+	};
+
 	if (checking || !user) {
 		return (
 			<Center style={{ height: "100vh" }}>
@@ -213,12 +249,60 @@ export default function IncidentsPage() {
 			<Header user={user} />
 			<main className="flex-1 overflow-auto">
 				<div className="px-5 py-5" style={{ minWidth: 1120 }}>
-					<div className="mb-6">
-						<Text fw={700} size="xl" style={{ color: "var(--text)" }}>Incident Reports</Text>
-						<Text size="sm" c="dimmed" mt={8}>
-							Total incidents: {filtered.length} of {points.length}
-						</Text>
+					<div className="mb-6 flex items-start justify-between gap-4">
+						<div>
+							<Text fw={700} size="xl" style={{ color: "var(--text)" }}>Incident Reports</Text>
+							<Text size="sm" c="dimmed" mt={8}>
+								Total incidents: {filtered.length} of {points.length}
+							</Text>
+						</div>
+
+						<Menu position="bottom-end" width={260}>
+							<Menu.Target>
+								<button
+									type="button"
+									disabled={sorted.length === 0}
+									className="flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors duration-150 hover:bg-bg-card disabled:opacity-50 disabled:cursor-not-allowed"
+									style={{ border: "1px solid var(--border)", color: "var(--text)" }}
+								>
+									<IconDownload size={15} />
+									Export
+									<IconChevronDown size={14} color="var(--text-muted)" />
+								</button>
+							</Menu.Target>
+							<Menu.Dropdown>
+								<Menu.Label>
+									Export {sorted.length} filtered {sorted.length === 1 ? "incident" : "incidents"}
+								</Menu.Label>
+								{/* Menu.Item nests its children inside a <span>, so Text has to
+								    render as a span too rather than its default div. */}
+								{EXPORT_FORMATS.map((option) => (
+									<Menu.Item
+										key={option.value}
+										onClick={() => handleExport(option.value)}
+										rightSection={
+											<Text as="span" size="xs" c="dimmed">{option.extension}</Text>
+										}
+									>
+										<span className="flex flex-col leading-tight">
+											<span>{option.label}</span>
+											<Text as="span" size="xs" c="dimmed">{option.hint}</Text>
+										</span>
+									</Menu.Item>
+								))}
+							</Menu.Dropdown>
+						</Menu>
 					</div>
+
+					{exportNotice && (
+						<Alert
+							variant={exportNotice.variant}
+							title={exportNotice.variant === "success" ? "Export ready" : "Export incomplete"}
+							className="mb-4"
+						>
+							{exportNotice.message}
+						</Alert>
+					)}
 
 					<div className="space-y-4 mb-5">
 						<Input

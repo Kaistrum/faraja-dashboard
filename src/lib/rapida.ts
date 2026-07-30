@@ -177,6 +177,43 @@ export function mapInfrastructureType(raw: string | null): InfrastructureType {
   }
 }
 
+// ─── Report coordinate normalisation ──────────────────────────────────────────
+
+/**
+ * The reports API delivers report coordinates with the two axes transposed:
+ * the field named `lat` carries the longitude and `lon` carries the latitude.
+ *
+ * Verified 2026-07-30 against every report on the live backend that has
+ * coordinates at all. Report 9d1b65a3 sits in Nairobi and returns
+ * `lat: 36.949585, lon: -1.286499`; Nairobi is lat −1.29, lon 36.95. Read at
+ * face value those points plot in the Mediterranean.
+ *
+ * Responder locations are NOT affected — PATCH /api/responders/{id}/ takes
+ * {lat, lon} and correctly stores Point(lon, lat), which is why
+ * `rapidaResponderToInternal` reads its coordinates straight through.
+ *
+ * The defect is in the report ingest path, which lives outside this repo, so it
+ * is corrected here at the one place report coordinates enter the dashboard.
+ * When ingest is fixed *and* the stored rows are migrated, set this to false —
+ * leaving it on would transpose correct data straight back.
+ */
+export const REPORT_LATLON_INVERTED = true;
+
+/**
+ * A report's position as GeoJSON [lng, lat], or null when it has none usable.
+ * Callers must treat null as "not mappable" rather than substituting a default,
+ * so a report never silently claims a location it does not have.
+ */
+export function reportCoordinates(report: { lat: number | null; lon: number | null }): [number, number] | null {
+  const [lat, lng] = REPORT_LATLON_INVERTED ? [report.lon, report.lat] : [report.lat, report.lon];
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  // Out-of-range values mean the axes are transposed the other way from what
+  // REPORT_LATLON_INVERTED assumes; drop the point rather than plot one that is
+  // certainly wrong.
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return [lng, lat];
+}
+
 // Zone ID from 0.1° geographic grid (~11 km cells)
 export function zoneIdFromCoords(lat: number, lon: number): string {
   const gridLat = (Math.round(lat * 10) / 10).toFixed(1);
@@ -190,7 +227,9 @@ export function rapidaReportToPoint(
   report: RapidaFinalReport,
   assignment?: RapidaAssignment | null,
 ): PointFeature | null {
-  if (report.lat == null || report.lon == null) return null;
+  const coords = reportCoordinates(report);
+  if (coords === null) return null;
+  const [lng, lat] = coords;
 
   const infrastructure_type = mapInfrastructureType(report.infrastructure_type);
   const disaster_type = mapDisasterType(report.ai_disaster_type, report.nature_of_crisis);
@@ -198,7 +237,7 @@ export function rapidaReportToPoint(
 
   const properties: PointProperties = {
     point_id: report.report_id,
-    zone_id: zoneIdFromCoords(report.lat, report.lon),
+    zone_id: zoneIdFromCoords(lat, lng),
     infrastructure_name: `${infrastructure_type} (${(report.building_footprint_id ?? report.report_id).slice(0, 6)})`,
     infrastructure_type,
     disaster_type,
@@ -216,7 +255,7 @@ export function rapidaReportToPoint(
 
   return {
     type: "Feature",
-    geometry: { type: "Point", coordinates: [report.lon, report.lat] },
+    geometry: { type: "Point", coordinates: [lng, lat] },
     properties,
   };
 }
