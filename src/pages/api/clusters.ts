@@ -1,16 +1,26 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { PointFeature } from "@/types";
 import { fetchAllPages, rapidaReportToPoint, type RapidaFinalReport, type RapidaAssignment } from "@/lib/rapida";
+import { getCached, setCached, invalidateCached } from "@/lib/serverCache";
 
 const BASE = (process.env.RAPIDA_API_BASE ?? "").replace(/\/+$/, "");
 
-// ─── Server-side cache (30 s) ─────────────────────────────────────────────────
-let reportCache: { points: PointFeature[]; expiresAt: number } | null = null;
+const POINTS_CACHE_KEY = "final-reports";
 const CACHE_TTL_MS = 30_000;
 
+/** Lets other routes (e.g. assignment writes) force the next /api/clusters read to be fresh. */
+export function invalidatePointsCache(): void {
+  invalidateCached(POINTS_CACHE_KEY);
+}
+
+/** Shared with /api/tasks — resolving a report's original_report_id needs the same join. */
+export async function getCachedPoints(): Promise<PointFeature[]> {
+  return getPoints();
+}
+
 async function getPoints(): Promise<PointFeature[]> {
-  const now = Date.now();
-  if (reportCache && reportCache.expiresAt > now) return reportCache.points;
+  const cached = getCached<PointFeature[]>(POINTS_CACHE_KEY);
+  if (cached) return cached;
 
   const [reports, assignments] = await Promise.all([
     fetchAllPages<RapidaFinalReport>(`${BASE}/final-reports/`),
@@ -38,7 +48,7 @@ async function getPoints(): Promise<PointFeature[]> {
     })
     .filter((p): p is PointFeature => p !== null);
 
-  reportCache = { points, expiresAt: now + CACHE_TTL_MS };
+  setCached(POINTS_CACHE_KEY, points, CACHE_TTL_MS);
   return points;
 }
 
@@ -56,10 +66,7 @@ function inBbox(
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
 
-  const { bbox, active_session_id } = req.query;
-  if (typeof active_session_id === "string") {
-    console.log("active_session_id:", active_session_id);
-  }
+  const { bbox } = req.query;
 
   if (!BASE) return res.status(200).json({ points: [] });
 

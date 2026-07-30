@@ -246,6 +246,11 @@ export function rapidaReportToPoint(
     assigned: assignment != null && assignment.status !== "completed" && assignment.status !== "cancelled",
     assigned_to: assignment?.responder_name ?? null,
     task_status: assignment ? mapAssignmentStatus(assignment.status) : "unassigned",
+    assignment_id: assignment?.assignment_id ?? null,
+    assigned_responder_id: assignment?.responder ?? null,
+    assignment_status_raw: assignment?.status ?? null,
+    assignment_priority: assignment ? mapAssignmentPriority(assignment.priority) : null,
+    assignment_notes: assignment?.notes ?? null,
     report_summary: `${infrastructure_type} affected by ${report.nature_of_crisis ?? "unknown event"} — ${report.damage_level ?? "unknown"} damage.`,
     original_report_id: report.original_report_id ?? null,
     submitted_at: report.submitted_at,
@@ -260,7 +265,16 @@ export function rapidaReportToPoint(
   };
 }
 
-export function rapidaResponderToInternal(r: RapidaResponder): Responder {
+/** Assignment states that still occupy a responder's capacity. */
+function isActiveAssignment(a: RapidaAssignment): boolean {
+  return a.status === "pending" || a.status === "in_progress";
+}
+
+export function rapidaResponderToInternal(
+  r: RapidaResponder,
+  assignments: RapidaAssignment[] = [],
+): Responder {
+  const active = assignments.filter((a) => a.responder === r.responder_id && isActiveAssignment(a));
   return {
     id: r.responder_id,
     name: r.name,
@@ -269,7 +283,7 @@ export function rapidaResponderToInternal(r: RapidaResponder): Responder {
     current_task_zone: null,
     lat: r.location?.coordinates[1] ?? null,
     lng: r.location?.coordinates[0] ?? null,
-    active_task_count: 0,
+    active_task_count: active.length,
     max_tasks: 5,
   };
 }
@@ -292,6 +306,20 @@ function mapAssignmentPriority(p: RapidaAssignment["priority"]): TaskAssignment[
     case "critical": return "Critical";
     case "high":     return "Medium";
     default:         return "Low";
+  }
+}
+
+/**
+ * Inverse of mapAssignmentPriority — used when creating/updating an
+ * assignment. "Medium" maps to "high" (not "normal") so that an assignment
+ * created here reads back through mapAssignmentPriority as "Medium" too;
+ * the backend's "normal" value would silently collapse to "Low" on read.
+ */
+export function mapPriorityToBackend(p: TaskAssignment["priority"] | undefined): "low" | "high" | "critical" {
+  switch (p) {
+    case "Critical": return "critical";
+    case "Medium":   return "high";
+    default:         return "low";
   }
 }
 

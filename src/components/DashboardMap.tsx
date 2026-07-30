@@ -401,7 +401,7 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 	}, []);
 
 	useEffect(() => {
-		const controller = new AbortController();
+		let controller = new AbortController();
 
 		async function loadPoints() {
 			try {
@@ -428,7 +428,16 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 		}
 
 		loadPoints();
-		return () => controller.abort();
+		// Poll so responder status changes (accepted/resolved) show up on the
+		// map without a manual refresh — there is no push/realtime channel.
+		const interval = setInterval(() => {
+			controller = new AbortController();
+			loadPoints();
+		}, 10_000);
+		return () => {
+			clearInterval(interval);
+			controller.abort();
+		};
 	}, [onVisibleZonesChange]);
 
 	const iconCreateFunction = (cluster: any) => {

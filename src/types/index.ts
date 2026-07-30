@@ -66,6 +66,12 @@ export interface PointProperties {
   assigned: boolean;
   assigned_to: string | null;
   task_status: TaskStatus;
+  /** Raw backend assignment fields — absent (null) when the point has no assignment. */
+  assignment_id: string | null;
+  assigned_responder_id: string | null;
+  assignment_status_raw: "pending" | "in_progress" | "completed" | "cancelled" | null;
+  assignment_priority: "Low" | "Medium" | "Critical" | null;
+  assignment_notes: string | null;
   report_summary: string;
   original_report_id: string | null;
   submitted_at: string;

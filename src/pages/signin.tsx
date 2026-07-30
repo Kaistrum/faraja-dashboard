@@ -97,6 +97,12 @@ export default function SignIn() {
 					<Text size="xs" c="dimmed" ta="center" mt="md">
 						Demo: johndoe@gmail.com / password123
 					</Text>
+					<Text size="xs" ta="center" mt="sm">
+						Responding to an assignment?{" "}
+						<a href="/field-signin" style={{ color: "var(--accent)", fontWeight: 600 }}>
+							Sign in as a field responder
+						</a>
+					</Text>
 				</Card>
 			</div>
 		</div>

@@ -138,8 +138,8 @@ export default function IncidentsPage() {
 
 	useEffect(() => {
 		let mounted = true;
-		const fetchIncidents = async () => {
-			setLoading(true);
+		const fetchIncidents = async (showSpinner: boolean) => {
+			if (showSpinner) setLoading(true);
 			try {
 				const res = await fetch("/api/clusters");
 				if (res.ok) {
@@ -152,9 +152,13 @@ export default function IncidentsPage() {
 				if (mounted) setLoading(false);
 			}
 		};
-		fetchIncidents();
+		fetchIncidents(true);
+		// Poll so responder status changes (accepted/resolved) show up here
+		// without a manual refresh — there is no push/realtime channel.
+		const interval = setInterval(() => fetchIncidents(false), 10_000);
 		return () => {
 			mounted = false;
+			clearInterval(interval);
 		};
 	}, []);
 

@@ -149,6 +149,7 @@ export default function RespondersPage() {
 	const [priority, setPriority] = useState<"Low" | "Medium" | "Critical">("Low");
 	const [instructions, setInstructions] = useState("");
 	const [notification, setNotification] = useState<string | null>(null);
+	const [assignError, setAssignError] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [loadingZone, setLoadingZone] = useState(false);
 
@@ -214,6 +215,10 @@ export default function RespondersPage() {
 			}
 		};
 		fetchResponders();
+		// Poll so a responder accepting/resolving a task (which changes their
+		// active_task_count) shows up here without a manual refresh.
+		const interval = setInterval(fetchResponders, 10_000);
+		return () => clearInterval(interval);
 	}, []);
 
 	// ── Zone from URL param ─────────────────────────────────────────────────────
@@ -339,6 +344,8 @@ export default function RespondersPage() {
 		if (eligibility && !eligibility.eligible) return;
 
 		setSaving(true);
+		setAssignError(null);
+		setNotification(null);
 		try {
 			const pointParam = router.query.point;
 			const res = await fetch("/api/tasks", {
@@ -352,25 +359,27 @@ export default function RespondersPage() {
 					instructions,
 				}),
 			});
-			if (res.ok) {
-				const data = await res.json();
-				if (data.success) {
-					setNotification(`Task assigned to ${selectedResponder.name}`);
-					setResponders((prev) =>
-						prev.map((r) =>
-							r.id === selectedResponder.id
-								? { ...r, status: "busy" as const, current_task_zone: selectedZoneId, active_task_count: r.active_task_count + 1 }
-								: r,
-						),
-					);
-					setInstructions("");
-					setSelectedResponder((prev) =>
-						prev ? { ...prev, status: "busy" as const, current_task_zone: selectedZoneId, active_task_count: prev.active_task_count + 1 } : prev,
-					);
-				}
+			const data = await res.json().catch(() => ({ success: false }));
+			if (res.ok && data.success) {
+				setNotification(`Task assigned to ${selectedResponder.name}`);
+				setResponders((prev) =>
+					prev.map((r) =>
+						r.id === selectedResponder.id
+							? { ...r, status: "busy" as const, current_task_zone: selectedZoneId, active_task_count: r.active_task_count + 1 }
+							: r,
+					),
+				);
+				setInstructions("");
+				setSelectedResponder((prev) =>
+					prev ? { ...prev, status: "busy" as const, current_task_zone: selectedZoneId, active_task_count: prev.active_task_count + 1 } : prev,
+				);
+			} else {
+				setAssignError(
+					typeof data.error === "string" ? data.error : "Assignment failed — please try again.",
+				);
 			}
 		} catch {
-			// ignore
+			setAssignError("Assignment failed — could not reach the server.");
 		} finally {
 			setSaving(false);
 		}
@@ -891,6 +900,9 @@ export default function RespondersPage() {
 									)}
 								{notification && (
 									<Alert title="Success" variant="success" className="mt-3">{notification}</Alert>
+								)}
+								{assignError && (
+									<Alert title="Assignment failed" variant="danger" className="mt-3">{assignError}</Alert>
 								)}
 							</Card>
 						</Stack>
