@@ -146,6 +146,7 @@ export default function RespondersPage() {
 	const [selectedResponder, setSelectedResponder] = useState<Responder | null>(null);
 	const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 	const [zoneData, setZoneData] = useState<ZoneFeature | null>(null);
+	const [zonePoints, setZonePoints] = useState<PointFeature[]>([]);
 	const [priority, setPriority] = useState<"Low" | "Medium" | "Critical">("Low");
 	const [instructions, setInstructions] = useState("");
 	const [notification, setNotification] = useState<string | null>(null);
@@ -232,6 +233,7 @@ export default function RespondersPage() {
 	useEffect(() => {
 		if (!selectedZoneId) {
 			setZoneData(null);
+			setZonePoints([]);
 			return;
 		}
 		let mounted = true;
@@ -242,11 +244,12 @@ export default function RespondersPage() {
 				if (res.ok) {
 					const data = await res.json();
 					const allPoints = (data.points ?? []) as PointFeature[];
-					const zonePoints = allPoints.filter(
+					const matchingPoints = allPoints.filter(
 						(pt) => pt.properties.zone_id === selectedZoneId,
 					);
-					if (mounted && zonePoints.length > 0) {
-						setZoneData(buildZoneFromPoints(selectedZoneId, zonePoints));
+					if (mounted && matchingPoints.length > 0) {
+						setZoneData(buildZoneFromPoints(selectedZoneId, matchingPoints));
+						setZonePoints(matchingPoints);
 					}
 				}
 			} catch {
@@ -338,8 +341,26 @@ export default function RespondersPage() {
 		}
 	};
 
+	// The specific incident an assignment will target: the explicit point from
+	// an IncidentDrawer deep link, or (for a zone-only assign) the first
+	// zone incident that's actually assignable — i.e. not already assigned and
+	// still linked to a live backend report. Every assignment needs one
+	// concrete report; a zone alone isn't something the backend can assign to.
+	const assignTargetPoint = useMemo(() => {
+		if (pointData) return pointData;
+		return (
+			zonePoints.find(
+				(p) => !p.properties.assigned_responder_id && p.properties.original_report_id,
+			) ?? null
+		);
+	}, [pointData, zonePoints]);
+
+	const assignTargetUnassignable = pointData
+		? !pointData.properties.original_report_id
+		: zoneData !== null && assignTargetPoint === null;
+
 	const handleAssign = async () => {
-		if (!selectedZoneId || !selectedResponder) return;
+		if (!selectedZoneId || !selectedResponder || !assignTargetPoint) return;
 		const eligibility = responderEligibility.get(selectedResponder.id);
 		if (eligibility && !eligibility.eligible) return;
 
@@ -347,13 +368,12 @@ export default function RespondersPage() {
 		setAssignError(null);
 		setNotification(null);
 		try {
-			const pointParam = router.query.point;
 			const res = await fetch("/api/tasks", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					zone_id: selectedZoneId,
-					point_id: typeof pointParam === "string" ? pointParam : undefined,
+					point_id: assignTargetPoint.properties.point_id,
 					responder_id: selectedResponder.id,
 					priority,
 					instructions,
@@ -432,6 +452,7 @@ export default function RespondersPage() {
 	const assignButtonDisabled =
 		!selectedResponder ||
 		!zoneData ||
+		!assignTargetPoint ||
 		(selectedResponderEligibility !== null && !selectedResponderEligibility.eligible);
 
 	const selectedResponderCard = useMemo(() => {
@@ -814,6 +835,14 @@ export default function RespondersPage() {
 									)}
 									<Text size="xs" c="dimmed">Assigning task for this specific report</Text>
 								</Card>
+							)}
+
+							{assignTargetUnassignable && (
+								<Alert variant="warning" icon={<IconAlertTriangle size={16} />}>
+									{pointData
+										? "This incident can't be assigned — its source report is missing from the backend."
+										: "No incidents in this zone can be assigned right now — their source reports are missing from the backend."}
+								</Alert>
 							)}
 
 							{selectedResponderCard}
