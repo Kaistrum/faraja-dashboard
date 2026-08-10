@@ -8,8 +8,8 @@ import { IconAlertCircle } from "@tabler/icons-react";
 import Image from "next/image";
 
 const MOCK_USERS = [
-	{ email: "johndoe@gmail.com", password: "password123", name: "Jane Doe" },
-	{ email: "admin@undp.org", password: "admin123", name: "Admin User" }
+	{ id: "u1", email: "johndoe@gmail.com", password: "password123", name: "Jane Doe", role: "coordinator" },
+	{ id: "u2", email: "admin@undp.org", password: "admin123", name: "Admin User", role: "admin" }
 ];
 
 export default function SignIn() {
@@ -31,7 +31,7 @@ export default function SignIn() {
 		if (user) {
 			localStorage.setItem(
 				"auth_user",
-				JSON.stringify({ name: user.name, email: user.email })
+				JSON.stringify({ id: user.id, name: user.name, email: user.email, role: user.role })
 			);
 			router.push("/dashboard");
 		} else {
@@ -96,12 +96,6 @@ export default function SignIn() {
 
 					<Text size="xs" c="dimmed" ta="center" mt="md">
 						Demo: johndoe@gmail.com / password123
-					</Text>
-					<Text size="xs" ta="center" mt="sm">
-						Responding to an assignment?{" "}
-						<a href="/field-signin" style={{ color: "var(--accent)", fontWeight: 600 }}>
-							Sign in as a field responder
-						</a>
 					</Text>
 				</Card>
 			</div>

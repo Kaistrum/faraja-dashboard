@@ -49,6 +49,12 @@ export default function FieldSignIn() {
 			"auth_responder",
 			JSON.stringify({ id: responder.id, name: responder.name, team: responder.team }),
 		);
+		// Best-effort — a responder should still reach their tasks even if this fails.
+		fetch(`/api/responders/${responder.id}`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ is_active: true }),
+		}).catch(() => {});
 		router.push("/field");
 	}
 

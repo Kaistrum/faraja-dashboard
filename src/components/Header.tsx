@@ -9,6 +9,7 @@ import { FarajaMark } from "@/components/icons";
 interface User {
 	name: string;
 	email: string;
+	role?: string;
 }
 
 interface HeaderProps {
@@ -22,6 +23,7 @@ const NAV_LINKS = [
 	{ label: "Incidents", href: "/incidents" },
 	{ label: "Responders", href: "/responders" },
 	{ label: "Weighting", href: "/scoring" },
+	{ label: "Add Responder", href: "/add-responder", adminOnly: true },
 ];
 
 export default function Header({ user, onOpenAssistant }: HeaderProps) {
@@ -43,7 +45,7 @@ export default function Header({ user, onOpenAssistant }: HeaderProps) {
 				<Text fw={700} style={{ fontSize: 13, letterSpacing: "-0.01em" }}>Response Console</Text>
 			</div>
 			<nav className="hidden md:flex items-center h-full" aria-label="Main navigation">
-				{NAV_LINKS.map((link) => {
+				{NAV_LINKS.filter((link) => !link.adminOnly || user.role === "admin").map((link) => {
 					const active = router.pathname === link.href;
 					return (
 						<button
