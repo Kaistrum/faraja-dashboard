@@ -9,7 +9,7 @@ import Image from "next/image";
 
 const MOCK_USERS = [
 	{ id: "u1", email: "johndoe@gmail.com", password: "password123", name: "Jane Doe", role: "coordinator" },
-	{ id: "u2", email: "admin@undp.org", password: "admin123", name: "Admin User", role: "admin" }
+	{ id: "u2", email: "admin@faraja.org", password: "admin123", name: "Admin User", role: "admin" }
 ];
 
 export default function SignIn() {
