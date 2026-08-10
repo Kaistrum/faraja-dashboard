@@ -102,6 +102,9 @@ export interface ZoneProperties {
 
 export type ZoneFeature = GeoJSON.Feature<GeoJSON.Point, ZoneProperties>;
 
+/** How many active (pending/in-progress) tasks a responder can hold at once. */
+export const MAX_TASKS_PER_RESPONDER = 10;
+
 export interface Responder {
   id: string;
   name: string;
@@ -159,7 +162,7 @@ export function canAssignToResponder(
   if (responder.status === "offline")
     return { eligible: false, reason: "Responder is offline", distanceKm: null };
   if (deriveAvailability(responder) === "full")
-    return { eligible: false, reason: "At capacity (5/5 tasks)", distanceKm: null };
+    return { eligible: false, reason: `At capacity (${responder.max_tasks}/${responder.max_tasks} tasks)`, distanceKm: null };
   if (responder.lat == null || responder.lng == null)
     return { eligible: false, reason: "Location unknown", distanceKm: null };
 

@@ -3,15 +3,16 @@
  * Server-side only — no browser APIs.
  */
 
-import type {
-  PointFeature,
-  PointProperties,
-  DisasterType,
-  InfrastructureType,
-  DamageLevel,
-  Responder,
-  TaskAssignment,
-  TaskStatus,
+import {
+  MAX_TASKS_PER_RESPONDER,
+  type PointFeature,
+  type PointProperties,
+  type DisasterType,
+  type InfrastructureType,
+  type DamageLevel,
+  type Responder,
+  type TaskAssignment,
+  type TaskStatus,
 } from "@/types";
 
 // ─── Raw RAPIDA shapes ────────────────────────────────────────────────────────
@@ -284,7 +285,7 @@ export function rapidaResponderToInternal(
     lat: r.location?.coordinates[1] ?? null,
     lng: r.location?.coordinates[0] ?? null,
     active_task_count: active.length,
-    max_tasks: 5,
+    max_tasks: MAX_TASKS_PER_RESPONDER,
   };
 }
 

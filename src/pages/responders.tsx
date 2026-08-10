@@ -462,8 +462,8 @@ export default function RespondersPage() {
 		const avail = deriveAvailability(selectedResponder);
 		const availStyle = AVAILABILITY_STYLES[avail];
 		const availLabel =
-			avail === "busy" ? `Busy (${selectedResponder.active_task_count}/5)`
-			: avail === "full" ? "Full (5/5)"
+			avail === "busy" ? `Busy (${selectedResponder.active_task_count}/${selectedResponder.max_tasks})`
+			: avail === "full" ? `Full (${selectedResponder.active_task_count}/${selectedResponder.max_tasks})`
 			: avail === "offline" ? "Offline"
 			: "Available";
 		return (
@@ -527,8 +527,8 @@ export default function RespondersPage() {
 									const avail = deriveAvailability(responder);
 									const availStyle = AVAILABILITY_STYLES[avail];
 									const availLabel =
-										avail === "busy" ? `Busy (${responder.active_task_count}/5)`
-										: avail === "full" ? "Full (5/5)"
+										avail === "busy" ? `Busy (${responder.active_task_count}/${responder.max_tasks})`
+										: avail === "full" ? `Full (${responder.active_task_count}/${responder.max_tasks})`
 										: avail === "offline" ? "Offline"
 										: "Available";
 									const eligInfo = responderEligibility.get(responder.id) ?? null;
