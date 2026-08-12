@@ -584,7 +584,10 @@ export default function DashboardPage() {
             </Modal>
 
             <div className="flex flex-1 overflow-hidden">
-                <div className="flex-1 relative">
+                {/* zIndex:0 keeps the map (and leaflet's popup pane, which sits at
+                    z-index 1050) contained in its own stacking context, so an open
+                    popup can't leak above the report modal / assistant drawer. */}
+                <div className="flex-1 relative" style={{ zIndex: 0 }}>
                     <DashboardMap
                         onSelect={setSelection}
                         onVisibleZonesChange={setVisibleZones}

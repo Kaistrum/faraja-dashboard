@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, createContext, useContext } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
@@ -382,6 +382,93 @@ function PhotoInPopup({
 	);
 }
 
+// Carries the currently-open popup's id to the (memoized) popup bodies. Reading
+// it via context lets only the open popup re-render to lazy-load its photo,
+// instead of recreating every marker — which would flicker the open popup.
+const OpenPopupContext = createContext<string | null>(null);
+
+// ── PointPopupContent — popup body, kept out of the memoized marker map so the
+//    marker elements stay referentially stable across re-renders. ─────────────
+function PointPopupContent({
+	pt,
+	onViewReportRef,
+	onExpandPhoto,
+	onAssign,
+}: {
+	pt: PointFeatureExtended;
+	onViewReportRef: { current: ((point: PointFeature) => void) | undefined };
+	onExpandPhoto: (url: string, name: string) => void;
+	onAssign: (zoneId: string) => void;
+}) {
+	const openPopupId = useContext(OpenPopupContext);
+	const p = pt.properties;
+	const damageColor = DAMAGE_COLORS[p.damage_level] ?? "#8d897d";
+	const isOpen = openPopupId === p.point_id;
+	return (
+		<Stack gap={8}>
+			{/* Photo thumbnail — loaded lazily only while this popup is open */}
+			{isOpen && p.original_report_id && (
+				<PhotoInPopup
+					reportId={p.original_report_id}
+					name={p.infrastructure_name}
+					onExpand={(url) => onExpandPhoto(url, p.infrastructure_name)}
+				/>
+			)}
+
+			<Text fw={700} size="sm">{p.infrastructure_name}</Text>
+			<div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+				<Badge variant="neutral" icon={<DisasterGlyph type={p.disaster_type} size={12} stroke={2} />}>
+					{p.disaster_type}
+				</Badge>
+				<Badge style={{ backgroundColor: damageColor, color: "#fff", border: 0 }}>
+					{p.damage_level}
+				</Badge>
+			</div>
+			<div>
+				<Text size="xs" c="dimmed">Infrastructure type</Text>
+				<Text size="xs" fw={500}>{p.infrastructure_type}</Text>
+			</div>
+			{(p.ai_disaster_type || p.ai_damage_severity) && (
+				<div style={{ background: "var(--bg-card)", padding: "6px 8px" }}>
+					<div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+						<FarajaMark size={14} />
+						<Text size="xs" fw={700}>Faraja's assessment</Text>
+					</div>
+					<Text size="xs" c="dimmed">
+						{[formatAiLabel(p.ai_disaster_type), formatAiLabel(p.ai_damage_severity)]
+							.filter(Boolean)
+							.join(" · ")}
+					</Text>
+				</div>
+			)}
+			{p.assigned ? (
+				<Badge style={{ backgroundColor: "var(--success-faint)", color: "var(--success)", border: 0 }}>
+					Assigned to {p.assigned_to}
+				</Badge>
+			) : (
+				<>
+					<Badge style={{ backgroundColor: "var(--danger-faint)", color: "var(--danger)", border: 0 }}>
+						Not assigned
+					</Badge>
+					<Button size="sm" fullWidth className="mt-1.5" onClick={() => onAssign(p.zone_id)}>
+						Assign
+						<IconArrowRight size={14} className="ml-1.5" />
+					</Button>
+				</>
+			)}
+			<Button
+				size="sm"
+				fullWidth
+				variant="outline"
+				icon={<IconFileText size={14} />}
+				onClick={() => onViewReportRef.current?.(pt)}
+			>
+				View full report
+			</Button>
+		</Stack>
+	);
+}
+
 export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisiblePointsChange, flyTo, onViewReport }: DashboardMapProps) {
 	const router = useRouter();
 	const { theme } = useTheme();
@@ -490,11 +577,51 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 		onSelect({ cluster: syntheticZone, point: null });
 	};
 
-	const handlePointClick = (pt: PointFeatureExtended) => {
-		const zonePoints = points.filter((item) => item.properties.zone_id === pt.properties.zone_id);
-		const parentZone = buildZoneFeature(pt.properties.zone_id, zonePoints);
-		onSelect({ cluster: parentZone, point: pt });
-	};
+	// `onViewReport` is an inline prop that changes identity every parent render;
+	// route it through a ref so it doesn't invalidate the memoized markers below.
+	const onViewReportRef = useRef(onViewReport);
+	onViewReportRef.current = onViewReport;
+
+	const assignFromPopup = useCallback((zoneId: string) => {
+		router.push(`/responders?zone=${zoneId}`);
+	}, [router]);
+
+	// Markers are memoized on `points` so re-renders triggered by popup open/close,
+	// the photo lightbox, viewport tracking, or new inline parent props don't
+	// recreate marker/popup elements — which is what makes an open popup flicker.
+	const markers = useMemo(
+		() =>
+			points.map((pt) => {
+				const [lng, lat] = pt.geometry.coordinates;
+				return (
+					<Marker
+						key={pt.properties.point_id}
+						position={[lat, lng]}
+						icon={createPointIcon(pt.properties.damage_level, pt.properties.disaster_type, false)}
+						alt={pt.properties.damage_level}
+						title={pt.properties.point_id}
+						eventHandlers={{
+							click: () => {
+								const zonePoints = points.filter((item) => item.properties.zone_id === pt.properties.zone_id);
+								onSelect({ cluster: buildZoneFeature(pt.properties.zone_id, zonePoints), point: pt });
+							},
+							popupopen: () => setOpenPopupId(pt.properties.point_id),
+							popupclose: () => setOpenPopupId((prev) => (prev === pt.properties.point_id ? null : prev)),
+						}}
+					>
+						<Popup minWidth={260}>
+							<PointPopupContent
+								pt={pt}
+								onViewReportRef={onViewReportRef}
+								onExpandPhoto={openLightbox}
+								onAssign={assignFromPopup}
+							/>
+						</Popup>
+					</Marker>
+				);
+			}),
+		[points, onSelect, openLightbox, assignFromPopup],
+	);
 
 	// Defaults to the theme's basemap until the user explicitly picks one.
 	const activeBasemap =
@@ -592,104 +719,21 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 					<ViewportTracker allPoints={points} onChange={onVisiblePointsChange} />
 				)}
 				{flyTo && <FlyToPoint key={flyTo.seq} lat={flyTo.lat} lng={flyTo.lng} />}
-				<MarkerClusterGroup
-					iconCreateFunction={iconCreateFunction}
-					chunkedLoading
-					showCoverageOnHover={false}
-					animate
-					animateAddingMarkers={false}
-					maxClusterRadius={220}
-					spiderfyOnMaxZoom
-					disableClusteringAtZoom={18}
-					eventHandlers={{ clusterclick: handleClusterClick } as any}
-				>
-					{points.map((pt) => {
-						const [lng, lat] = pt.geometry.coordinates;
-						const damageColor = DAMAGE_COLORS[pt.properties.damage_level] ?? "#8d897d";
-						return (
-							<Marker
-								key={pt.properties.point_id}
-								position={[lat, lng]}
-								icon={createPointIcon(pt.properties.damage_level, pt.properties.disaster_type, false)}
-								alt={pt.properties.damage_level}
-								title={pt.properties.point_id}
-								eventHandlers={{
-									click: () => handlePointClick(pt),
-									popupopen: () => setOpenPopupId(pt.properties.point_id),
-									popupclose: () => setOpenPopupId((prev) => (prev === pt.properties.point_id ? null : prev)),
-								}}
-							>
-								<Popup minWidth={260}>
-									<Stack gap={8}>
-										{/* Photo thumbnail — loaded lazily when popup opens */}
-										{openPopupId === pt.properties.point_id && pt.properties.original_report_id && (
-											<PhotoInPopup
-												reportId={pt.properties.original_report_id}
-												name={pt.properties.infrastructure_name}
-												onExpand={(url) => openLightbox(url, pt.properties.infrastructure_name)}
-											/>
-										)}
-
-										<Text fw={700} size="sm">{pt.properties.infrastructure_name}</Text>
-										<div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-											<Badge
-												variant="neutral"
-												icon={<DisasterGlyph type={pt.properties.disaster_type} size={12} stroke={2} />}
-											>
-												{pt.properties.disaster_type}
-											</Badge>
-											<Badge style={{ backgroundColor: damageColor, color: "#fff", border: 0 }}>
-												{pt.properties.damage_level}
-											</Badge>
-										</div>
-										<div>
-											<Text size="xs" c="dimmed">Infrastructure type</Text>
-											<Text size="xs" fw={500}>{pt.properties.infrastructure_type}</Text>
-										</div>
-										{(pt.properties.ai_disaster_type || pt.properties.ai_damage_severity) && (
-											<div style={{ background: "var(--bg-card)", padding: "6px 8px" }}>
-												<div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-													<FarajaMark size={14} />
-													<Text size="xs" fw={700}>Faraja's assessment</Text>
-												</div>
-												<Text size="xs" c="dimmed">
-													{[formatAiLabel(pt.properties.ai_disaster_type), formatAiLabel(pt.properties.ai_damage_severity)]
-														.filter(Boolean)
-														.join(" · ")}
-												</Text>
-											</div>
-										)}
-										{pt.properties.assigned ? (
-											<Badge style={{ backgroundColor: "var(--success-faint)", color: "var(--success)", border: 0 }}>
-												Assigned to {pt.properties.assigned_to}
-											</Badge>
-										) : (
-											<>
-												<Badge style={{ backgroundColor: "var(--danger-faint)", color: "var(--danger)", border: 0 }}>
-													Not assigned
-												</Badge>
-												<Button
-													size="sm"
-													fullWidth
-													className="mt-1.5"
-													onClick={() => router.push(`/responders?zone=${pt.properties.zone_id}`)}
-												>
-													Assign
-													<IconArrowRight size={14} className="ml-1.5" />
-												</Button>
-											</>
-										)}
-										{onViewReport && (
-											<Button size="sm" fullWidth variant="outline" icon={<IconFileText size={14} />} onClick={() => onViewReport(pt)}>
-												View full report
-											</Button>
-										)}
-									</Stack>
-								</Popup>
-							</Marker>
-						);
-					})}
-				</MarkerClusterGroup>
+				<OpenPopupContext.Provider value={openPopupId}>
+					<MarkerClusterGroup
+						iconCreateFunction={iconCreateFunction}
+						chunkedLoading
+						showCoverageOnHover={false}
+						animate
+						animateAddingMarkers={false}
+						maxClusterRadius={220}
+						spiderfyOnMaxZoom
+						disableClusteringAtZoom={18}
+						eventHandlers={{ clusterclick: handleClusterClick } as any}
+					>
+						{markers}
+					</MarkerClusterGroup>
+				</OpenPopupContext.Provider>
 			</MapContainer>
 		</div>
 	);

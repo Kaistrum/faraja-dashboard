@@ -1,0 +1,7 @@
+# Node-backend base URL (server-side API routes)
+
+RAPIDA_API_BASE=http://5.189.150.44:8000/api
+
+# AI Assistant base URL (browser-side, requires NEXT*PUBLIC* prefix)
+
+NEXT_PUBLIC_FARAJA_API_URL=http://5.189.150.44/
