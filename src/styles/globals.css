@@ -281,6 +281,9 @@ input[type="range"] {
 /* Keep the open popup above the map controls (basemap/legend/assistant sit at
    z-index 1000) while staying under the assistant drawer (1100) and lightbox. */
 .leaflet-popup-pane { z-index: 1050; }
+/* The stratum-ui Modal overlay ships at z-50; the map's leaflet panes now live
+   in the global stacking context (up to 1050), so lift the modal above them. */
+.fixed.inset-0.z-50 { z-index: 1200; }
 .leaflet-popup-content-wrapper {
 	box-shadow: var(--shadow-lg);
 	border: 1px solid var(--border);
