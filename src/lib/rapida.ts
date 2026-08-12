@@ -22,6 +22,7 @@ export interface RapidaFinalReport {
   original_report_id?: string | null;
   lat: number | null;
   lon: number | null;
+  location_description?: string | null;
   building_footprint_id: string | null;
   infrastructure_type: string | null;
   nature_of_crisis: string | null;
@@ -240,6 +241,7 @@ export function rapidaReportToPoint(
     point_id: report.report_id,
     zone_id: zoneIdFromCoords(lat, lng),
     infrastructure_name: `${infrastructure_type} (${(report.building_footprint_id ?? report.report_id).slice(0, 6)})`,
+    location_description: report.location_description ?? null,
     infrastructure_type,
     disaster_type,
     damage_level,

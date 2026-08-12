@@ -59,6 +59,8 @@ export interface PointProperties {
   point_id: string;
   zone_id: string;
   infrastructure_name: string;
+  /** Free-text location the report was filed against; falls back to infrastructure_name when the backend omits it. */
+  location_description: string | null;
   infrastructure_type: InfrastructureType;
   disaster_type: DisasterType;
   damage_level: DamageLevel;

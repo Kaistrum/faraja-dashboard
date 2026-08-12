@@ -105,6 +105,12 @@ function formatDate(iso: string) {
 	return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
+function formatTime(iso: string) {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return null;
+	return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function IncidentsPage() {
 	const router = useRouter();
 	const [user, setUser] = useState<AuthUser | null>(null);
@@ -181,6 +187,7 @@ export default function IncidentsPage() {
 			const props = point.properties;
 			const haystack = [
 				props.point_id,
+				props.location_description ?? "",
 				props.infrastructure_name,
 				props.infrastructure_type,
 				props.disaster_type,
@@ -403,7 +410,7 @@ export default function IncidentsPage() {
 													onClick={() => setSelectedIncident(point)}
 													style={{ cursor: "pointer" }}
 												>
-													<Table.Td style={{ minWidth: 220 }}>{props.infrastructure_name}</Table.Td>
+													<Table.Td style={{ minWidth: 220 }}>{props.location_description ?? props.infrastructure_name}</Table.Td>
 													<Table.Td>
 														<Chip bg="var(--border-strong)" color="var(--text)">
 															{props.infrastructure_type as InfrastructureType}
@@ -427,7 +434,12 @@ export default function IncidentsPage() {
 															{statusStyle.label}
 														</Chip>
 													</Table.Td>
-													<Table.Td className="tnum" style={{ whiteSpace: "nowrap" }}>{formatDate(props.submitted_at)}</Table.Td>
+													<Table.Td className="tnum" style={{ whiteSpace: "nowrap" }}>
+														<div>{formatDate(props.submitted_at)}</div>
+														{formatTime(props.submitted_at) && (
+															<Text size="xs" c="dimmed">{formatTime(props.submitted_at)}</Text>
+														)}
+													</Table.Td>
 													<Table.Td style={{ minWidth: 310, maxWidth: 460 }}>
 														<Text size="sm" lineClamp={2}>{props.report_summary}</Text>
 													</Table.Td>
