@@ -388,6 +388,9 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 	const [basemapId, setBasemapId] = useState<string | null>(null);
 	const [points, setPoints] = useState<PointFeatureExtended[]>([]);
 	const pointsMapRef = useRef<Map<string, PointFeatureExtended>>(new Map());
+	// Signature of the last rendered points — lets the 10s poll skip re-rendering
+	// (and remounting markers) when nothing that affects the map has changed.
+	const pointsSigRef = useRef<string>("");
 	const [openPopupId, setOpenPopupId] = useState<string | null>(null);
 	const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
 
@@ -409,6 +412,20 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 				if (!res.ok) return;
 				const data = (await res.json()) as { points?: PointFeatureExtended[] };
 				const fetchedPoints = data.points ?? [];
+
+				// Bail out of the state update when the poll returned equivalent data.
+				// Replacing `points` with fresh object references remounts every
+				// marker, which closes/reopens (flickers) any open popup.
+				const signature = fetchedPoints
+					.map((pt) => {
+						const p = pt.properties;
+						const [lng, lat] = pt.geometry.coordinates;
+						return `${p.point_id}|${p.damage_level}|${p.disaster_type}|${p.task_status}|${p.assigned_to ?? ""}|${lng},${lat}`;
+					})
+					.join(";");
+				if (signature === pointsSigRef.current) return;
+				pointsSigRef.current = signature;
+
 				setPoints(fetchedPoints);
 				pointsMapRef.current = new Map(fetchedPoints.map((pt) => [pt.properties.point_id, pt]));
 
@@ -563,7 +580,7 @@ export default function DashboardMap({ onSelect, onVisibleZonesChange, onVisible
 					</div>
 				</div>
 			)}
-			<MapContainer center={[-0.8, 37.5]} zoom={8} maxZoom={19} style={{ height: "100%", width: "100%", zIndex: 10 }}>
+			<MapContainer center={[-0.8, 37.5]} zoom={8} maxZoom={19} style={{ height: "100%", width: "100%" }}>
 				<TileLayer
 					key={activeBasemap.id}
 					url={activeBasemap.url}
